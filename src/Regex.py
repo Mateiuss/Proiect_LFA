@@ -115,7 +115,8 @@ class Bracket(Regex):
 class BigLetters(Regex):
     def thompson(self) -> NFA[int]:
         S = {chr(i) for i in range(ord('A'), ord('Z') + 1)}
-        d = {(int(0), chr(i)) : {1} for i in range(ord('A'), ord('Z') + 1)} | {(int(1), chr(i)) : {2} for i in range(ord('A'), ord('Z') + 1)}
+        d = {(int(0), chr(i)) : {1} for i in range(ord('A'), ord('Z') + 1)}
+        d[(int(1), '')] = {2}
 
         return NFA(S, {0, 1, 2}, 0, d, {2})
 
@@ -124,7 +125,8 @@ class BigLetters(Regex):
 class SmallLetters(Regex):
     def thompson(self) -> NFA[int]:
         S = {chr(i) for i in range(ord('a'), ord('z') + 1)}
-        d = {(int(0), chr(i)) : {1} for i in range(ord('a'), ord('z') + 1)} | {(int(1), chr(i)) : {2} for i in range(ord('a'), ord('z') + 1)}
+        d = {(int(0), chr(i)) : {1} for i in range(ord('a'), ord('z') + 1)}
+        d[(int(1), '')] = {2}
 
         return NFA(S, {0, 1, 2}, 0, d, {2})
 
@@ -132,7 +134,8 @@ class SmallLetters(Regex):
 class Numbers(Regex):
     def thompson(self) -> NFA[int]:
         S = {chr(i) for i in range(ord('0'), ord('9') + 1)}
-        d = {(int(0), chr(i)) : {1} for i in range(ord('0'), ord('9') + 1)} | {(int(1), chr(i)) : {2} for i in range(ord('0'), ord('9') + 1)}
+        d = {(int(0), chr(i)) : {1} for i in range(ord('0'), ord('9') + 1)}
+        d[(int(1), '')] = {2}
 
         return NFA(S, {0, 1, 2}, 0, d, {2})
     
