@@ -1,6 +1,5 @@
 from .NFA import NFA
 from dataclasses import dataclass
-import re
 
 class Regex:
     def thompson(self) -> NFA[int]:
@@ -21,6 +20,8 @@ class Concat(Regex):
     def thompson(self) -> NFA[int]:
         left_nfa = self.left.thompson()
         right_nfa = self.right.thompson()
+
+        right_nfa.remap_states(lambda x: x + len(left_nfa.K))
 
         left_nfa.d[(left_nfa.F.pop(), '')] = {right_nfa.q0}
         left_nfa.d.update(right_nfa.d)
