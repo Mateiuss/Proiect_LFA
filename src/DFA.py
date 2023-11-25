@@ -15,6 +15,9 @@ class DFA[STATE]:
         current_state = self.q0
 
         for i in range(len(word)):
+            if (current_state, word[i]) not in self.d:
+                return False
+            
             current_state = self.d[(current_state, word[i])]
 
         return current_state in self.F

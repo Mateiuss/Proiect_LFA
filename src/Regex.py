@@ -21,10 +21,12 @@ class Concat(Regex):
         left_nfa = self.left.thompson()
         right_nfa = self.right.thompson()
 
-        right_nfa.remap_states(lambda x: x + len(left_nfa.K))
+        right_nfa = right_nfa.remap_states(lambda x: x + len(left_nfa.K))
 
+        left_nfa.S.update(right_nfa.S)
         left_nfa.d[(left_nfa.F.pop(), '')] = {right_nfa.q0}
         left_nfa.d.update(right_nfa.d)
+        left_nfa.K = left_nfa.K.union(right_nfa.K)
         left_nfa.F = right_nfa.F
 
         return left_nfa
@@ -38,18 +40,22 @@ class Union(Regex):
         left_nfa = self.left.thompson()
         right_nfa = self.right.thompson()
 
-        right_nfa.remap_states(lambda x: x + len(left_nfa.K))
+        right_nfa = right_nfa.remap_states(lambda x: x + len(left_nfa.K))
 
+        left_nfa.S.update(right_nfa.S)
         left_nfa.d[(-1, '')] = {left_nfa.q0, right_nfa.q0}
         left_nfa.d[left_nfa.F.pop(), ''] = {-2}
         left_nfa.d[right_nfa.F.pop(), ''] = {-2}
         left_nfa.d.update(right_nfa.d)
         left_nfa.F = {-2}
+        left_nfa.K = left_nfa.K.union(right_nfa.K)
         left_nfa.K.add(-1)
         left_nfa.K.add(-2)
         left_nfa.q0 = -1
 
-        left_nfa.remap_states(lambda x: x + 2)
+        left_nfa = left_nfa.remap_states(lambda x: x + 2)
+
+        print(left_nfa)
 
         return left_nfa
 
@@ -60,17 +66,16 @@ class Star(Regex):
     def thompson(self) -> NFA[int]:
         regex_nfa = self.regex.thompson()
 
-        regex_nfa.d[(-1, '')] = {regex_nfa.q0}
-        regex_nfa.d[regex_nfa.F.pop(), ''] = {-2}
-        regex_nfa.d[(-1, '')].add(-2)
-        regex_nfa.d[regex_nfa.F.pop(), ''] = {regex_nfa.q0}
-        regex_nfa.d.update({(-1, ''): {-2}})
+        final_state = regex_nfa.F.pop()
+
+        regex_nfa.d[(-1, '')] = {regex_nfa.q0, -2}
+        regex_nfa.d[(final_state, '')] = {regex_nfa.q0, -2}
         regex_nfa.K.add(-1)
         regex_nfa.K.add(-2)
         regex_nfa.F = {-2}
         regex_nfa.q0 = -1
 
-        regex_nfa.remap_states(lambda x: x + 2)
+        regex_nfa = regex_nfa.remap_states(lambda x: x + 2)
 
         return regex_nfa
 
@@ -89,7 +94,15 @@ class Question(Regex):
 
     def thompson(self) -> NFA[int]:
         regex_nfa = self.regex.thompson()
-        regex_nfa.d[(regex_nfa.q0, '')] = regex_nfa.F
+
+        final_state = regex_nfa.F.pop()
+        regex_nfa.F.add(final_state)
+
+        if (regex_nfa.q0, '') in regex_nfa.d:
+            regex_nfa.d[(regex_nfa.q0, '')].add(final_state)
+        else:
+            regex_nfa.d[(regex_nfa.q0, '')] = {final_state}
+
         return regex_nfa
 
 @dataclass
@@ -138,7 +151,108 @@ class Numbers(Regex):
         d[(int(1), '')] = {2}
 
         return NFA(S, {0, 1, 2}, 0, d, {2})
-    
+
+
+def is_char(c: str) -> bool:
+    return c.isalpha() or c.isdigit()
 
 def parse_regex(regex: str) -> Regex:
-    return Char(regex)
+    s = []
+    i = 0
+
+    while i < len(regex):
+        if regex[i] == ' ':
+            i += 1
+            continue
+
+        if is_char(regex[i]):
+            if len(s) == 0:
+                s.append(Char(regex[i]))
+            else:
+                last = s.pop()
+                if last == '|':
+                    s.append(last)
+                    s.append(Char(regex[i]))
+                elif last != '(':
+                    s.append(Concat(last, Char(regex[i])))
+                elif last == '(':
+                    s.append(last)
+                    s.append(Char(regex[i]))
+        elif regex[i] == '*' or regex[i] == '+' or regex[i] == '?' or regex[i] == '(' or regex[i] == ')' or regex[i] == '|' or regex[i] == '[':
+            if len(s) == 1:
+                if regex[i] == '*':
+                    s.append(Star(s.pop()))
+                elif regex[i] == '?':
+                    s.append(Question(s.pop()))
+                elif regex[i] == '+':
+                    s.append(Plus(s.pop()))
+                elif regex[i] == '[':
+                    if regex[i + 1] == 'A':
+                        s.append(BigLetters())
+                        i += 4
+                    elif regex[i + 1] == 'a':
+                        s.append(SmallLetters())
+                        i += 4
+                    elif regex[i + 1] == '0':
+                        s.append(Numbers())
+                        i += 4
+                else:
+                    s.append(regex[i])
+            else:
+                if regex[i] == ')':
+                    last = s.pop()
+
+                    if isinstance(last, Regex):
+                        op = s.pop()
+                        if op == '(': 
+                            s.append(last)
+                        elif op == '|':
+                            other = s.pop()
+                            s.pop()
+                            s.append(Union(other, last))
+                elif regex[i] == '(':
+                    s.append(regex[i])
+                elif regex[i] == '|':
+                    s.append(regex[i])
+                elif regex[i] == '*':
+                    last = s.pop()
+
+                    s.append(Star(last))
+                elif regex[i] == '?':
+                    last = s.pop()
+
+                    s.append(Question(last))
+                elif regex[i] == '+':
+                    last = s.pop()
+
+                    s.append(Plus(last))
+                elif regex[i] == '[':
+                    if regex[i + 1] == 'A':
+                        s.append(BigLetters())
+                        i += 4
+                    elif regex[i + 1] == 'a':
+                        s.append(SmallLetters())
+                        i += 4
+                    elif regex[i + 1] == '0':
+                        s.append(Numbers())
+                        i += 4
+        else:
+            raise Exception('invalid character')
+        
+        i += 1
+        
+    print(s)
+
+    if len(s) == 1:
+        return s.pop()
+    else:
+        last = s.pop()
+
+        if isinstance(last, Regex):
+            op = s.pop()
+            if op == '|':
+                return Union(s.pop(), last)
+            elif isinstance(op, Regex):
+                return Concat(op, last)
+            
+        raise Exception('invalid regex')
