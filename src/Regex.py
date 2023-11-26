@@ -200,15 +200,14 @@ def parse_regex(regex: str) -> Regex:
             elif regex[i] == '(':
                 s.append(regex[i])
             elif regex[i] == ')':
-                print(s)
+                last = 'c'
 
-                while 1:
+                while last != '(':
                     last = s.pop()
                     if last == '(':
                         break
 
                     nd_last = s.pop()
-
                     if nd_last == '(':
                         s.append(last)
                         break
@@ -218,23 +217,37 @@ def parse_regex(regex: str) -> Regex:
                         s.append(Concat(nd_last, last))
             elif regex[i] == '|':
                 if (len(s) > 1):
-                    last = s.pop()
-                    nd_last = s.pop()
+                    last = 'c'
 
-                    if nd_last == '|':
-                        s.append(Union(s.pop(), last))
-                    elif isinstance(nd_last, Regex):
-                        s.append(Concat(nd_last, last))
-                    else:
-                        s.append(nd_last)
-                        s.append(last)
+                    while last != '(' and len(s) > 0:
+                        last = s.pop()
+                        if last == '(':
+                            s.append(last)
+                            break
+
+                        if len(s) == 0:
+                            s.append(last)
+                            break
+
+                        nd_last = s.pop()
+                        if nd_last == '(':
+                            s.append(nd_last)
+                            s.append(last)
+                            break
+
+                        if nd_last == '|':
+                            s.append(Union(s.pop(), last))
+                        elif isinstance(nd_last, Regex):
+                            s.append(Concat(nd_last, last))
+                        else:
+                            s.append(nd_last)
+                            s.append(last)
 
                 s.append(regex[i])
             elif regex[i] == '\\':
                 s.append(Char(regex[i + 1]))
                 i = i + 1
             else:
-                print("Nu cunosc caracterul asta")
                 s.append(Char(regex[i]))
 
         i += 1
@@ -247,7 +260,5 @@ def parse_regex(regex: str) -> Regex:
             s.append(Union(s.pop(), last))
         else:
             s.append(Concat(nd_last, last))
-
-    print(s[0])
             
     return s.pop()
