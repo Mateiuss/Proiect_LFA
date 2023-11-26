@@ -22,9 +22,13 @@ class Concat(Regex):
         right_nfa = self.right.thompson()
 
         right_nfa = right_nfa.remap_states(lambda x: x + len(left_nfa.K))
+        left_final_state = left_nfa.F.pop()
 
         left_nfa.S.update(right_nfa.S)
-        left_nfa.d[(left_nfa.F.pop(), '')] = {right_nfa.q0}
+        if (left_final_state, '') in left_nfa.d:
+            left_nfa.d[(left_final_state, '')].add(right_nfa.q0)
+        else:
+            left_nfa.d[(left_final_state, '')] = {right_nfa.q0}
         left_nfa.d.update(right_nfa.d)
         left_nfa.K = left_nfa.K.union(right_nfa.K)
         left_nfa.F = right_nfa.F
@@ -44,8 +48,16 @@ class Union(Regex):
 
         left_nfa.S.update(right_nfa.S)
         left_nfa.d[(-1, '')] = {left_nfa.q0, right_nfa.q0}
-        left_nfa.d[left_nfa.F.pop(), ''] = {-2}
-        left_nfa.d[right_nfa.F.pop(), ''] = {-2}
+        left_final_state = left_nfa.F.pop()
+        if (left_final_state, '') in left_nfa.d:
+            left_nfa.d[(left_final_state, '')].add(-2)
+        else:
+            left_nfa.d[(left_final_state, '')] = {-2}
+        right_final_state = right_nfa.F.pop()
+        if (right_final_state, '') in right_nfa.d:
+            right_nfa.d[(right_final_state, '')].add(-2)
+        else:
+            right_nfa.d[(right_final_state, '')] = {-2}
         left_nfa.d.update(right_nfa.d)
         left_nfa.F = {-2}
         left_nfa.K = left_nfa.K.union(right_nfa.K)
@@ -54,8 +66,6 @@ class Union(Regex):
         left_nfa.q0 = -1
 
         left_nfa = left_nfa.remap_states(lambda x: x + 2)
-
-        print(left_nfa)
 
         return left_nfa
 
@@ -69,7 +79,10 @@ class Star(Regex):
         final_state = regex_nfa.F.pop()
 
         regex_nfa.d[(-1, '')] = {regex_nfa.q0, -2}
-        regex_nfa.d[(final_state, '')] = {regex_nfa.q0, -2}
+        if (final_state, '') in regex_nfa.d:
+            regex_nfa.d[(final_state, '')].update({regex_nfa.q0, -2})
+        else:
+            regex_nfa.d[(final_state, '')] = {regex_nfa.q0, -2}
         regex_nfa.K.add(-1)
         regex_nfa.K.add(-2)
         regex_nfa.F = {-2}
@@ -156,6 +169,7 @@ class Numbers(Regex):
 def is_char(c: str) -> bool:
     return c.isalpha() or c.isdigit()
 
+# (, ), [, *, +, ?, |
 def parse_regex(regex: str) -> Regex:
     s = []
     i = 0
@@ -166,93 +180,74 @@ def parse_regex(regex: str) -> Regex:
             continue
 
         if is_char(regex[i]):
-            if len(s) == 0:
-                s.append(Char(regex[i]))
-            else:
-                last = s.pop()
-                if last == '|':
-                    s.append(last)
-                    s.append(Char(regex[i]))
-                elif last != '(':
-                    s.append(Concat(last, Char(regex[i])))
-                elif last == '(':
-                    s.append(last)
-                    s.append(Char(regex[i]))
-        elif regex[i] == '*' or regex[i] == '+' or regex[i] == '?' or regex[i] == '(' or regex[i] == ')' or regex[i] == '|' or regex[i] == '[':
-            if len(s) == 1:
+            s.append(Char(regex[i]))
+        else:
+            if regex[i] == '*' or regex[i] == '+' or regex[i] == '?':
                 if regex[i] == '*':
                     s.append(Star(s.pop()))
-                elif regex[i] == '?':
-                    s.append(Question(s.pop()))
                 elif regex[i] == '+':
                     s.append(Plus(s.pop()))
-                elif regex[i] == '[':
-                    if regex[i + 1] == 'A':
-                        s.append(BigLetters())
-                        i += 4
-                    elif regex[i + 1] == 'a':
-                        s.append(SmallLetters())
-                        i += 4
-                    elif regex[i + 1] == '0':
-                        s.append(Numbers())
-                        i += 4
                 else:
-                    s.append(regex[i])
+                    s.append(Question(s.pop()))
+            elif regex[i] == '[':
+                if regex[i + 1] == 'a':
+                    s.append(SmallLetters())
+                elif regex[i + 1] == 'A':
+                    s.append(BigLetters())
+                else:
+                    s.append(Numbers())
+                i = i + 4
+            elif regex[i] == '(':
+                s.append(regex[i])
+            elif regex[i] == ')':
+                print(s)
+
+                while 1:
+                    last = s.pop()
+                    if last == '(':
+                        break
+
+                    nd_last = s.pop()
+
+                    if nd_last == '(':
+                        s.append(last)
+                        break
+                    elif nd_last == '|':
+                        s.append(Union(s.pop(), last))
+                    else:
+                        s.append(Concat(nd_last, last))
+            elif regex[i] == '|':
+                if (len(s) > 1):
+                    last = s.pop()
+                    nd_last = s.pop()
+
+                    if nd_last == '|':
+                        s.append(Union(s.pop(), last))
+                    elif isinstance(nd_last, Regex):
+                        s.append(Concat(nd_last, last))
+                    else:
+                        s.append(nd_last)
+                        s.append(last)
+
+                s.append(regex[i])
+            elif regex[i] == '\\':
+                s.append(Char(regex[i + 1]))
+                i = i + 1
             else:
-                if regex[i] == ')':
-                    last = s.pop()
+                print("Nu cunosc caracterul asta")
+                s.append(Char(regex[i]))
 
-                    if isinstance(last, Regex):
-                        op = s.pop()
-                        if op == '(': 
-                            s.append(last)
-                        elif op == '|':
-                            other = s.pop()
-                            s.pop()
-                            s.append(Union(other, last))
-                elif regex[i] == '(':
-                    s.append(regex[i])
-                elif regex[i] == '|':
-                    s.append(regex[i])
-                elif regex[i] == '*':
-                    last = s.pop()
-
-                    s.append(Star(last))
-                elif regex[i] == '?':
-                    last = s.pop()
-
-                    s.append(Question(last))
-                elif regex[i] == '+':
-                    last = s.pop()
-
-                    s.append(Plus(last))
-                elif regex[i] == '[':
-                    if regex[i + 1] == 'A':
-                        s.append(BigLetters())
-                        i += 4
-                    elif regex[i + 1] == 'a':
-                        s.append(SmallLetters())
-                        i += 4
-                    elif regex[i + 1] == '0':
-                        s.append(Numbers())
-                        i += 4
-        else:
-            raise Exception('invalid character')
-        
         i += 1
-        
-    print(s)
 
-    if len(s) == 1:
-        return s.pop()
-    else:
+    while len(s) > 1:
         last = s.pop()
+        nd_last = s.pop()
 
-        if isinstance(last, Regex):
-            op = s.pop()
-            if op == '|':
-                return Union(s.pop(), last)
-            elif isinstance(op, Regex):
-                return Concat(op, last)
+        if nd_last == '|':
+            s.append(Union(s.pop(), last))
+        else:
+            s.append(Concat(nd_last, last))
+
+    print(s[0])
             
-        raise Exception('invalid regex')
+    return s.pop()
