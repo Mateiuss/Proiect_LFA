@@ -157,7 +157,6 @@ class Numbers(Regex):
 def is_char(c: str) -> bool:
     return c.isalpha() or c.isdigit()
 
-# (, ), [, *, +, ?, |
 def parse_regex(regex: str) -> Regex:
     s = []
     i = 0

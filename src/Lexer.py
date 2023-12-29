@@ -35,14 +35,10 @@ class Lexer:
 
         pass
 
-    def is_sink(state, dfa) -> bool:
-        for symbol in dfa.S:
-            if dfa.d[(state, symbol)] != state:
-                return False
-            
-        return True
+    def is_sink(state) -> bool:
+        return state == frozenset()
     
-    def is_final(tokens, state, dfa) -> bool:
+    def is_final(tokens, state) -> bool:
         for s in state:
             if s in tokens.keys():
                 return True
@@ -65,7 +61,7 @@ class Lexer:
         last_character_pos = -1
         last_line_number = 0
         while i < len(word):
-            if Lexer.is_sink(curr_state, self.lexer):
+            if Lexer.is_sink(curr_state):
                 if last_token != ():
                     character_pos = last_character_pos
                     line_number = last_line_number
@@ -81,7 +77,7 @@ class Lexer:
                     continue
                 else:
                     return [("", "No viable alternative at character " + str(character_pos) + ", line " + str(line_number))]
-            elif Lexer.is_final(self.tokens, curr_state, self.lexer):
+            elif Lexer.is_final(self.tokens, curr_state):
                 last_token = ()
                 for j in curr_state:
                     if j in self.tokens.keys():
