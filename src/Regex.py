@@ -126,18 +126,6 @@ class Char(Regex):
         return NFA(set([self.char]), {0, 1}, 0, {(0, self.char): {1}}, {1})
 
 @dataclass
-class Epsilon(Regex):
-    def thompson(self) -> NFA[int]:
-        return NFA(set(), {0, 1}, 0, {(0, ''): {1}}, {1})
-
-@dataclass
-class Bracket(Regex):
-    regex: Regex
-
-    def thompson(self) -> NFA[int]:
-        return self.regex.thompson()
-
-@dataclass
 class BigLetters(Regex):
     def thompson(self) -> NFA[int]:
         S = {chr(i) for i in range(ord('A'), ord('Z') + 1)}
