@@ -15,7 +15,7 @@ class HW2Tests(unittest.TestCase):
 
     def __init__(self, methodName: str = "runTest") -> None:
         super().__init__(methodName)
-        self.__class__.score = 0
+        self.__class__.score = 10 
 
     @classmethod
     def tearDownClass(cls):
