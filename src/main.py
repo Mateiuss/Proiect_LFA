@@ -21,7 +21,6 @@ class Node:
 class Parser:
 	def __init__ (self, token_list):
 		self.token_list = token_list
-		self.index = 0
 
 	def parse(self) -> Node:
 		self.root = Node("ROOT", None, [])
@@ -32,6 +31,36 @@ class Parser:
 			match self.token_list[i][0]:
 				case "NAT" | "EMPTY_LIST" | "ID":
 					curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
+				case "LAMBDA":
+					curr_node.children.append(Node("FUNCTION", "lambda", [], curr_node))
+					i = i + 1
+					curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
+					i = i + 2
+
+					match self.token_list[i][0]:
+						case "NAT" | "EMPTY_LIST" | "ID":
+							curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
+						case "LEFT_PARENTHESIS":
+							curr_node.children.append(Node("LIST", None, [], curr_node))
+							curr_node = curr_node.children[-1]
+
+							i = i + 1
+							no_of_left_parenthesis = 1
+							while no_of_left_parenthesis != 0:
+								match self.token_list[i][0]:
+									case "LEFT_PARENTHESIS":
+										no_of_left_parenthesis += 1
+										curr_node.children.append(Node("LIST", None, [], curr_node))
+										curr_node = curr_node.children[-1]
+									case "RIGHT_PARENTHESIS":
+										no_of_left_parenthesis -= 1
+										curr_node = curr_node.parent
+									case "NAT" | "EMPTY_LIST" | "ID":
+										curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
+								
+								i += 1
+								if no_of_left_parenthesis == 0:
+									i -= 1
 				case "++_FUNCTION":
 					curr_node.children.append(Node("FUNCTION", "++", [], curr_node))
 				case "+_FUNCTION":
@@ -73,6 +102,16 @@ class Parser:
 				ans += 0
 
 		return ans
+	
+	def replace_body_ids(self, body: Node, val: Node, id: str):
+		if body.type == "ID":
+			if body.value == id:
+				body.type = val.type
+				body.value = val.value
+				body.children = val.children
+		else:
+			for child in body.children:
+				self.replace_body_ids(child, val, id)
 
 	def reduce_tree(self, node: Node):
 		match node.type:
@@ -84,10 +123,10 @@ class Parser:
 				op = node.children[0].value
 				node.children = node.children[1:]
 
-				for child in node.children:
-					self.reduce_tree(child)
-
 				if op == "++":
+					for child in node.children:
+						self.reduce_tree(child)
+
 					curr = node.children[0]
 
 					if curr.type != "LIST":
@@ -102,9 +141,20 @@ class Parser:
 
 					node.children = node.children[1:]
 				elif op == "+":
+					for child in node.children:
+						self.reduce_tree(child)
+
 					node.type = "NAT"
 					node.value = self.sum_all(node)
 					node.children = []
+				elif op == "lambda":
+					self.reduce_tree(node.children[2])
+					self.replace_body_ids(node.children[1], node.children[2], node.children[0].value)
+
+					node.children = [node.children[1]]
+					self.reduce_tree(node.children[0])
+
+					node.parent.children = node.children
 
 	def print_tree(self, node: Node):
 		match node.type:
