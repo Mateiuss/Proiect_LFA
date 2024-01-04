@@ -2,175 +2,174 @@ from sys import argv
 from .Lexer import Lexer
 
 class Node:
-	def __init__(self, type, value, children, parent=None):
+	def __init__(self, type, value, parent=None):
 		self.type = type
 		self.value = value
-		self.children = children
 		self.parent = parent
+		self.children = []
+
+	def add_child(self, child):
+		self.children.append(child)
+
+	def top_child(self):
+		return self.children[-1]
 
 	def __str__(self):
-		if self.type == "NAT" or self.type == "EMPTY_LIST" or self.type == "ID" or self.type == "FUNCTION":
-			return str(self.value)
-		return str(self.type)
+		if self.type == "ROOT" or self.type == "LIST":
+			return self.type
+		return self.value
 	
 	def print_tree(self, level=0):
-		print("\t" * level + self.__str__())
+		print("  " * level + str(self))
 		for child in self.children:
 			child.print_tree(level + 1)
 	
 class Parser:
-	def __init__ (self, token_list):
+	def __init__(self, token_list):
 		self.token_list = token_list
 
-	def parse(self) -> Node:
-		self.root = Node("ROOT", None, [])
+	def sum(self, node):
+		s = 0
+		for child in node.children:
+			if child.type == "NAT":
+				s += int(child.value)
+			elif child.type == "LIST":
+				s += self.sum(child)
+
+		return s
+	
+	def concat(self, node):
+		concat_list = []
+
+		for child in node.children:
+			if child.type == "LIST":
+				concat_list += child.children
+			elif child.type == "NAT":
+				concat_list.append(child)
+
+		node.children = concat_list
+
+	def replace_id(self, expr, id, value):
+		if expr.type == "ID" and expr.value == id:
+			expr.type = value.type
+			expr.value = value.value
+			expr.children = value.children
+		elif expr.type == "LIST" or expr.type == "FUNCTION":
+			for child in expr.children:
+				self.replace_id(child, id, value)
+		elif expr.type == "LAMBDA":
+			if expr.children[0].value == id:
+				return
+			self.replace_id(expr.children[1], id, value)
+	
+	def parse(self):
+		self.root = Node("ROOT", None)
 		curr_node = self.root
 
-		i = 0
-		while i < len(self.token_list):
-			match self.token_list[i][0]:
-				case "NAT" | "EMPTY_LIST" | "ID":
-					curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
+		jump = 0
+		num_paranthesis = 0
+		last_func = []
+		for token in self.token_list:
+			match token[0]:
+				case "NAT" | "ID" | "EMPTY_LIST":
+					curr_node.add_child(Node(token[0], token[1], curr_node))
+				case "FUNCTION":
+					curr_node.add_child(Node("FUNCTION", token[1], curr_node))
+					curr_node = curr_node.top_child()
+					jump += 1
+					last_func.append(num_paranthesis)
 				case "LAMBDA":
-					curr_node.children.append(Node("FUNCTION", "lambda", [], curr_node))
-					i = i + 1
-					curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
-					i = i + 2
-
-					match self.token_list[i][0]:
-						case "NAT" | "EMPTY_LIST" | "ID":
-							curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
-						case "LEFT_PARENTHESIS":
-							curr_node.children.append(Node("LIST", None, [], curr_node))
-							curr_node = curr_node.children[-1]
-
-							i = i + 1
-							no_of_left_parenthesis = 1
-							while no_of_left_parenthesis != 0:
-								match self.token_list[i][0]:
-									case "LEFT_PARENTHESIS":
-										no_of_left_parenthesis += 1
-										curr_node.children.append(Node("LIST", None, [], curr_node))
-										curr_node = curr_node.children[-1]
-									case "RIGHT_PARENTHESIS":
-										no_of_left_parenthesis -= 1
-										curr_node = curr_node.parent
-									case "NAT" | "EMPTY_LIST" | "ID":
-										curr_node.children.append(Node(self.token_list[i][0], self.token_list[i][1], [], curr_node))
-								
-								i += 1
-								if no_of_left_parenthesis == 0:
-									i -= 1
-				case "++_FUNCTION":
-					curr_node.children.append(Node("FUNCTION", "++", [], curr_node))
-				case "+_FUNCTION":
-					curr_node.children.append(Node("FUNCTION", "+", [], curr_node))
+					curr_node.add_child(Node("LAMBDA", token[1], curr_node))
+					curr_node = curr_node.top_child()
+				case "LAMBDA_SEPARATOR":
+					continue
 				case "LEFT_PARENTHESIS":
-					if self.token_list[i + 1][0] not in ["LAMBDA", "++_FUNCTION", "+_FUNCTION"]:
-						curr_node.children.append(Node("LIST", None, [], curr_node))
-						curr_node = curr_node.children[-1]
-					else:
-						curr_node.children.append(Node("APPLICATION", None, [], curr_node))
-						curr_node = curr_node.children[-1]
+					curr_node.add_child(Node("LIST", token[1], curr_node))
+					curr_node = curr_node.top_child()
+					num_paranthesis += 1
 				case "RIGHT_PARENTHESIS":
 					curr_node = curr_node.parent
+					num_paranthesis -= 1
 
-			i += 1
+					if jump > 0:
+						tmp = last_func.pop()
 
-		return self.root
-	
-	def append_all(self, node: Node) -> [Node]:
-		ans = []
+					if jump > 0 and num_paranthesis == tmp:
+						curr_node = curr_node.parent
+						jump -= 1
+					elif jump > 0:
+						last_func.append(tmp)
 
-		for child in node.children:
-			if child.type == "LIST":
-				ans += self.append_all(child)
-			elif child.type == "NAT" or child.type == "ID":
-				ans.append(child)
+	def reverse_lambda_replacement(self, node):
+		if node.type == "LAMBDA":
+			move_node = node
+			while move_node.children[1].type == "LAMBDA":
+				self.reverse_lambda_replacement(move_node.children[2])
+				move_node = move_node.children[1]
 
-		return ans
-	
-	def sum_all(self, node: Node) -> int:
-		ans = 0
+			self.reverse_lambda_replacement(move_node.children[2])
 
-		for child in node.children:
-			if child.type == "LIST":
-				ans += self.sum_all(child)
-			elif child.type == "NAT":
-				ans += int(child.value)
-			elif child.type == "EMPTY_LIST":
-				ans += 0
-
-		return ans
-	
-	def replace_body_ids(self, body: Node, val: Node, id: str):
-		if body.type == "ID":
-			if body.value == id:
-				body.type = val.type
-				body.value = val.value
-				body.children = val.children
+			node_copy = node
+			while node_copy != move_node and node_copy.parent != move_node:
+				node_copy.children[2], move_node.children[2] = move_node.children[2], node_copy.children[2]
+				node_copy = node_copy.children[1]
+				move_node = move_node.parent
 		else:
-			for child in body.children:
-				self.replace_body_ids(child, val, id)
+			for child in node.children:
+				self.reverse_lambda_replacement(child)
 
-	def reduce_tree(self, node: Node):
+	def simplify(self, node):
 		match node.type:
 			case "ROOT" | "LIST":
 				for child in node.children:
-					self.reduce_tree(child)
-			case "APPLICATION":
-				node.type = "LIST"
-				op = node.children[0].value
-				node.children = node.children[1:]
+					self.simplify(child)
+			case "FUNCTION":
+				for child in node.children:
+					self.simplify(child)
 
-				if op == "++":
-					for child in node.children:
-						self.reduce_tree(child)
-
-					curr = node.children[0]
-
-					if curr.type != "LIST":
+				if node.value == "+":
+					node.parent.type = "NAT"
+					node.parent.value = str(self.sum(node))
+					node.parent.children = []
+				elif node.value == "++":
+					if node.top_child().type != "LIST":
 						return
+					
+					self.concat(node.top_child())
+					node.parent.type = "LIST"
+					node.parent.children = node.children[0].children
+			case "LAMBDA":	
+				self.simplify(node.children[2])
+				self.replace_id(node.children[1], node.children[0].value, node.children[2])
 
-					for child in curr.children:
-						if child.type == "LIST":
-							for c in child.children:
-								node.children.append(c)
-						elif child.type == "NAT":
-							node.children.append(child)
+				node.parent.type = node.children[1].type
+				node.parent.value = node.children[1].value
+				node.parent.children = node.children[1].children
+				for child in node.children[1].children:
+					child.parent = node.parent
 
-					node.children = node.children[1:]
-				elif op == "+":
-					for child in node.children:
-						self.reduce_tree(child)
+				node = node.parent
+				
+				self.simplify(node)
 
-					node.type = "NAT"
-					node.value = self.sum_all(node)
-					node.children = []
-				elif op == "lambda":
-					self.reduce_tree(node.children[2])
-					self.replace_body_ids(node.children[1], node.children[2], node.children[0].value)
 
-					node.children = [node.children[1]]
-					self.reduce_tree(node.children[0])
+	def print_tree(self):
+		self.root.print_tree()
 
-					node.parent.children = node.children
-
-	def print_tree(self, node: Node):
+	def print_nice(self, node):
 		match node.type:
 			case "ROOT":
 				for child in node.children:
-					self.print_tree(child)
+					self.print_nice(child)
 					print()
 			case "LIST":
 				print("(", end=" ")
 				for child in node.children:
-					self.print_tree(child)
+					self.print_nice(child)
 					print(" ", end="")
 				print(")", end="")
 			case "NAT" | "EMPTY_LIST" | "ID":
 				print(node.value, end="")
-				
 
 
 def main():
@@ -184,8 +183,8 @@ def main():
 		("EMPTY_LIST", "\\(\\)"),
 		("LAMBDA", "lambda\\ "),
 		("ID", "([a-z] | [A-Z])+"),
-		("++_FUNCTION", "\\+\\+"),
-		("+_FUNCTION", "\\+"),
+		("FUNCTION", "\\+\\+"),
+		("FUNCTION", "\\+"),
 		("LEFT_PARENTHESIS", "\\("),
 		("RIGHT_PARENTHESIS", "\\)"),
 		("LAMBDA_SEPARATOR", ":"),
@@ -204,13 +203,14 @@ def main():
 	token_list = list(filter(lambda x: x[0] not in ["SPACE", "NEWLINE", "TAB"], token_list))
 
 	parser = Parser(token_list)
-	tree = parser.parse()
-	# tree.print_tree()
+	parser.parse()
+	# parser.print_tree()
 
-	parser.reduce_tree(tree)
-	# tree.print_tree()
+	parser.reverse_lambda_replacement(parser.root)
+	parser.simplify(parser.root)
+	# parser.print_tree()
 
-	parser.print_tree(tree)
+	parser.print_nice(parser.root)
 
 if __name__ == '__main__':
     main()
