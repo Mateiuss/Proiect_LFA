@@ -147,8 +147,12 @@ class Parser:
 					node.parent.children = node.children[0].children
 			case "LAMBDA":	
 				if len(node.children) < 3:
-					self.simplify(node.children[1])
-					return
+					if node.parent.type == "LIST":
+						node.children.append(node.parent.children[1])
+						node.parent.children = [node]
+						node.children[2].parent = node
+					else:
+						return
 				self.simplify(node.children[2])
 				self.replace_id(node.children[1], node.children[0].value, node.children[2])
 
@@ -214,11 +218,11 @@ def main():
 
 	parser = Parser(token_list)
 	parser.parse()
-	parser.print_tree()
+	# parser.print_tree()
 
 	parser.reverse_lambda_replacement(parser.root)
 	parser.simplify(parser.root)
-	parser.print_tree()
+	# parser.print_tree()
 
 	parser.print_nice(parser.root)
 
