@@ -88,6 +88,9 @@ class Parser:
 					curr_node = curr_node.top_child()
 					num_paranthesis += 1
 				case "RIGHT_PARENTHESIS":
+					while curr_node.type == "LAMBDA" and len(curr_node.children) == 2:
+						curr_node = curr_node.parent
+
 					curr_node = curr_node.parent
 					num_paranthesis -= 1
 
@@ -102,6 +105,10 @@ class Parser:
 
 	def reverse_lambda_replacement(self, node):
 		if node.type == "LAMBDA":
+			if len(node.children) < 3:
+				self.reverse_lambda_replacement(node.children[1])
+				return
+
 			move_node = node
 			while move_node.children[1].type == "LAMBDA":
 				self.reverse_lambda_replacement(move_node.children[2])
@@ -139,6 +146,9 @@ class Parser:
 					node.parent.type = "LIST"
 					node.parent.children = node.children[0].children
 			case "LAMBDA":	
+				if len(node.children) < 3:
+					self.simplify(node.children[1])
+					return
 				self.simplify(node.children[2])
 				self.replace_id(node.children[1], node.children[0].value, node.children[2])
 
@@ -204,11 +214,11 @@ def main():
 
 	parser = Parser(token_list)
 	parser.parse()
-	# parser.print_tree()
+	parser.print_tree()
 
 	parser.reverse_lambda_replacement(parser.root)
 	parser.simplify(parser.root)
-	# parser.print_tree()
+	parser.print_tree()
 
 	parser.print_nice(parser.root)
 
