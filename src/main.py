@@ -8,21 +8,16 @@ class Node:
 		self.parent = parent
 		self.children = []
 
+	def deep_copy(self):
+		new_node = Node(self.type, self.value, self.parent)
+		new_node.children = [child.deep_copy() for child in self.children]
+		return new_node
+
 	def add_child(self, child):
 		self.children.append(child)
 
 	def top_child(self):
 		return self.children[-1]
-
-	def __str__(self):
-		if self.type == "ROOT" or self.type == "LIST":
-			return self.type
-		return self.value
-	
-	def print_tree(self, level=0):
-		print("  " * level + str(self))
-		for child in self.children:
-			child.print_tree(level + 1)
 	
 class Parser:
 	def __init__(self, token_list):
@@ -51,9 +46,13 @@ class Parser:
 
 	def replace_id(self, expr, id, value):
 		if expr.type == "ID" and expr.value == id:
+			value = value.deep_copy()
+
 			expr.type = value.type
 			expr.value = value.value
 			expr.children = value.children
+			for child in value.children:
+				child.parent = expr
 		elif expr.type == "LIST" or expr.type == "FUNCTION":
 			for child in expr.children:
 				self.replace_id(child, id, value)
@@ -125,6 +124,20 @@ class Parser:
 			for child in node.children:
 				self.reverse_lambda_replacement(child)
 
+	def move_arguments_up(self, node):
+		if node.type != "LIST" or len(node.children) == 1:
+			return
+		
+		if node.parent.type == "LIST":
+			self.move_arguments_up(node.parent)
+
+			node.parent.children += node.children[1:]
+			for child in node.children[1:]:
+				child.parent = node.parent
+
+			node.children = [node.children[0]]
+
+
 	def simplify(self, node):
 		match node.type:
 			case "ROOT" | "LIST":
@@ -145,14 +158,16 @@ class Parser:
 					self.concat(node.top_child())
 					node.parent.type = "LIST"
 					node.parent.children = node.children[0].children
-			case "LAMBDA":	
+			case "LAMBDA":
 				if len(node.children) < 3:
-					if node.parent.type == "LIST":
+					if node.parent.type == "LIST" and len(node.parent.children) == 2:
 						node.children.append(node.parent.children[1])
 						node.parent.children = [node]
 						node.children[2].parent = node
 					else:
+						self.simplify(node.children[1])
 						return
+				self.move_arguments_up(node.parent)
 				self.simplify(node.children[2])
 				self.replace_id(node.children[1], node.children[0].value, node.children[2])
 
@@ -166,25 +181,20 @@ class Parser:
 				
 				self.simplify(node)
 
-
-	def print_tree(self):
-		self.root.print_tree()
-
-	def print_nice(self, node):
+	def print(self, node):
 		match node.type:
 			case "ROOT":
 				for child in node.children:
-					self.print_nice(child)
+					self.print(child)
 					print()
 			case "LIST":
 				print("(", end=" ")
 				for child in node.children:
-					self.print_nice(child)
+					self.print(child)
 					print(" ", end="")
 				print(")", end="")
 			case "NAT" | "EMPTY_LIST" | "ID":
 				print(node.value, end="")
-
 
 def main():
 	if len(argv) != 2:
@@ -218,13 +228,9 @@ def main():
 
 	parser = Parser(token_list)
 	parser.parse()
-	# parser.print_tree()
-
 	parser.reverse_lambda_replacement(parser.root)
 	parser.simplify(parser.root)
-	# parser.print_tree()
-
-	parser.print_nice(parser.root)
+	parser.print(parser.root)
 
 if __name__ == '__main__':
     main()
