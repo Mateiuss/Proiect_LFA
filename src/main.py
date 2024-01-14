@@ -18,7 +18,7 @@ class Node:
 
 	def top_child(self):
 		return self.children[-1]
-	
+
 class Parser:
 	def __init__(self, token_list):
 		self.token_list = token_list
@@ -168,7 +168,6 @@ class Parser:
 						self.simplify(node.children[1])
 						return
 				self.move_arguments_up(node.parent)
-				self.simplify(node.children[2])
 				self.replace_id(node.children[1], node.children[0].value, node.children[2])
 
 				node.parent.type = node.children[1].type
