@@ -33,7 +33,6 @@ class Lexer:
 
         self.lexer = self.lexer.subset_construction()
 
-        pass
 
     def is_sink(state) -> bool:
         return state == frozenset()
