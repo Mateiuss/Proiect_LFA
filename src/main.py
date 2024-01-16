@@ -80,8 +80,6 @@ class Parser:
 				case "LAMBDA":
 					curr_node.add_child(Node("LAMBDA", token[1], curr_node))
 					curr_node = curr_node.top_child()
-				case "LAMBDA_SEPARATOR":
-					continue
 				case "LEFT_PARENTHESIS":
 					curr_node.add_child(Node("LIST", token[1], curr_node))
 					curr_node = curr_node.top_child()
@@ -96,11 +94,11 @@ class Parser:
 					if jump > 0:
 						tmp = last_func.pop()
 
-					if jump > 0 and num_paranthesis == tmp:
-						curr_node = curr_node.parent
-						jump -= 1
-					elif jump > 0:
-						last_func.append(tmp)
+						if num_paranthesis == tmp:
+							curr_node = curr_node.parent
+							jump -= 1
+						else:
+							last_func.append(tmp)
 
 	def reverse_lambda_replacement(self, node):
 		if node.type == "LAMBDA":
@@ -144,8 +142,7 @@ class Parser:
 				for child in node.children:
 					self.simplify(child)
 			case "FUNCTION":
-				for child in node.children:
-					self.simplify(child)
+				self.simplify(node.top_child())
 
 				if node.value == "+":
 					node.parent.type = "NAT"
@@ -223,7 +220,7 @@ def main():
 		for line in f:
 			token_list += lexer.lex(line)
 
-	token_list = list(filter(lambda x: x[0] not in ["SPACE", "NEWLINE", "TAB"], token_list))
+	token_list = list(filter(lambda x: x[0] not in ["SPACE", "NEWLINE", "TAB", "LAMBDA_SEPARATOR"], token_list))
 
 	parser = Parser(token_list)
 	parser.parse()
