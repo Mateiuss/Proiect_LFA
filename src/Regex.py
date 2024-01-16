@@ -163,13 +163,12 @@ def parse_regex(regex: str) -> Regex:
             i += 1
             continue
 
-        if regex[i] == '*' or regex[i] == '+' or regex[i] == '?':
-            if regex[i] == '*':
-                s.append(Star(s.pop()))
-            elif regex[i] == '+':
-                s.append(Plus(s.pop()))
-            else:
-                s.append(Question(s.pop()))
+        if regex[i] == '*':
+            s.append(Star(s.pop()))
+        elif regex[i] == '+':
+            s.append(Plus(s.pop()))
+        elif regex[i] == '?':
+            s.append(Question(s.pop()))
         elif regex[i] == '[':
             if regex[i + 1] == 'a':
                 s.append(SmallLetters())
@@ -202,11 +201,7 @@ def parse_regex(regex: str) -> Regex:
 
                 while last != '(' and len(s) > 0:
                     last = s.pop()
-                    if last == '(':
-                        s.append(last)
-                        break
-
-                    if len(s) == 0:
+                    if last == '(' or len(s) == 0:
                         s.append(last)
                         break
 
@@ -220,9 +215,6 @@ def parse_regex(regex: str) -> Regex:
                         s.append(Union(s.pop(), last))
                     elif isinstance(nd_last, Regex):
                         s.append(Concat(nd_last, last))
-                    else:
-                        s.append(nd_last)
-                        s.append(last)
 
             s.append(regex[i])
         elif regex[i] == '\\':
