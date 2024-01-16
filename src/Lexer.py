@@ -8,7 +8,7 @@ class Lexer:
         # initialisation should convert the specification to a dfa which will be used in the lex method
         # the specification is a list of pairs (TOKEN_NAME:REGEX)
 
-        self.lexer = NFA(set(), set(frozenset({0})), 0, {}, set())
+        self.lexer = NFA(set(), set([0]), 0, {}, set())
         self.tokens = {}
 
         i = 0
