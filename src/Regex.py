@@ -154,9 +154,6 @@ class Numbers(Regex):
         return NFA(S, {0, 1, 2}, 0, d, {2})
 
 
-def is_char(c: str) -> bool:
-    return c.isalpha() or c.isdigit()
-
 def parse_regex(regex: str) -> Regex:
     s = []
     i = 0
@@ -166,76 +163,73 @@ def parse_regex(regex: str) -> Regex:
             i += 1
             continue
 
-        if is_char(regex[i]):
-            s.append(Char(regex[i]))
-        else:
-            if regex[i] == '*' or regex[i] == '+' or regex[i] == '?':
-                if regex[i] == '*':
-                    s.append(Star(s.pop()))
-                elif regex[i] == '+':
-                    s.append(Plus(s.pop()))
+        if regex[i] == '*' or regex[i] == '+' or regex[i] == '?':
+            if regex[i] == '*':
+                s.append(Star(s.pop()))
+            elif regex[i] == '+':
+                s.append(Plus(s.pop()))
+            else:
+                s.append(Question(s.pop()))
+        elif regex[i] == '[':
+            if regex[i + 1] == 'a':
+                s.append(SmallLetters())
+            elif regex[i + 1] == 'A':
+                s.append(BigLetters())
+            else:
+                s.append(Numbers())
+            i = i + 4
+        elif regex[i] == '(':
+            s.append(regex[i])
+        elif regex[i] == ')':
+            last = 'c'
+
+            while last != '(':
+                last = s.pop()
+                if last == '(':
+                    break
+
+                nd_last = s.pop()
+                if nd_last == '(':
+                    s.append(last)
+                    break
+                elif nd_last == '|':
+                    s.append(Union(s.pop(), last))
                 else:
-                    s.append(Question(s.pop()))
-            elif regex[i] == '[':
-                if regex[i + 1] == 'a':
-                    s.append(SmallLetters())
-                elif regex[i + 1] == 'A':
-                    s.append(BigLetters())
-                else:
-                    s.append(Numbers())
-                i = i + 4
-            elif regex[i] == '(':
-                s.append(regex[i])
-            elif regex[i] == ')':
+                    s.append(Concat(nd_last, last))
+        elif regex[i] == '|':
+            if (len(s) > 1):
                 last = 'c'
 
-                while last != '(':
+                while last != '(' and len(s) > 0:
                     last = s.pop()
                     if last == '(':
+                        s.append(last)
+                        break
+
+                    if len(s) == 0:
+                        s.append(last)
                         break
 
                     nd_last = s.pop()
                     if nd_last == '(':
+                        s.append(nd_last)
                         s.append(last)
                         break
-                    elif nd_last == '|':
+
+                    if nd_last == '|':
                         s.append(Union(s.pop(), last))
-                    else:
+                    elif isinstance(nd_last, Regex):
                         s.append(Concat(nd_last, last))
-            elif regex[i] == '|':
-                if (len(s) > 1):
-                    last = 'c'
+                    else:
+                        s.append(nd_last)
+                        s.append(last)
 
-                    while last != '(' and len(s) > 0:
-                        last = s.pop()
-                        if last == '(':
-                            s.append(last)
-                            break
-
-                        if len(s) == 0:
-                            s.append(last)
-                            break
-
-                        nd_last = s.pop()
-                        if nd_last == '(':
-                            s.append(nd_last)
-                            s.append(last)
-                            break
-
-                        if nd_last == '|':
-                            s.append(Union(s.pop(), last))
-                        elif isinstance(nd_last, Regex):
-                            s.append(Concat(nd_last, last))
-                        else:
-                            s.append(nd_last)
-                            s.append(last)
-
-                s.append(regex[i])
-            elif regex[i] == '\\':
-                s.append(Char(regex[i + 1]))
-                i = i + 1
-            else:
-                s.append(Char(regex[i]))
+            s.append(regex[i])
+        elif regex[i] == '\\':
+            s.append(Char(regex[i + 1]))
+            i = i + 1
+        else:
+            s.append(Char(regex[i]))
 
         i += 1
 
