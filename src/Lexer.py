@@ -72,11 +72,9 @@ class Lexer:
                     last_token = ()
                     curr_state = self.lexer.q0
 
-                    sinked = True
-
                     continue
-                else:
-                    return [("", "No viable alternative at character " + str(character_pos) + ", line " + str(line_number))]
+                
+                return [("", "No viable alternative at character " + str(character_pos) + ", line " + str(line_number))]
             elif Lexer.is_final(self.tokens, curr_state):
                 last_token = ()
                 for j in curr_state:
@@ -99,16 +97,12 @@ class Lexer:
                 line_number += 1
                 character_pos = -1
 
-            letter = word[i]
-
-            if (curr_state, letter) not in self.lexer.d:
+            if (curr_state, word[i]) not in self.lexer.d:
                 return [("", "No viable alternative at character " + str(character_pos) + ", line " + str(line_number))]
 
-            curr_state = self.lexer.d[(curr_state, letter)]
+            curr_state = self.lexer.d[(curr_state, word[i])]
 
         if last_token != ():
             tokens.append((last_token[0], word))
 
         return tokens
-
-        # if an error occurs and the lexing fails, you should return none # todo: maybe add error messages as a task
